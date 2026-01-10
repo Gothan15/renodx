@@ -3,7 +3,7 @@ name: snapshot
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [Forge-Main]
     paths-ignore:
       - "**/*.md"
       - "docs/**"
@@ -111,7 +111,7 @@ jobs:
           path: "githubrelease"
 
   deploy:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/Forge-Main'
     needs: build
     permissions:
       pages: write # to deploy to Pages
