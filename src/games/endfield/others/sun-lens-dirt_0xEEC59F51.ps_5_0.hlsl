@@ -1,15 +1,7 @@
-// ---- Created with 3Dmigoto v1.3.16 on Thu Nov 27 22:02:47 2025
-
-// Blit shader
-
+// ---- Created with 3Dmigoto v1.4.1 on Thu Jan 22 10:20:16 2026
 Texture2D<float4> t0 : register(t0);
 
 SamplerState s0_s : register(s0);
-
-cbuffer cb0 : register(b0)
-{
-  float4 cb0[3];
-}
 
 
 
@@ -27,8 +19,8 @@ void main(
   uint4 bitmask, uiDest;
   float4 fDest;
 
-  r0.xyz = t0.SampleLevel(s0_s, v1.xy, cb0[2].x).xyz;
+  r0.xyz = t0.SampleLevel(s0_s, v1.xy, 0).xyz;
   o0.xyz = r0.xyz;
-  o0.w = 0;
+  o0.w = 1;
   return;
 }

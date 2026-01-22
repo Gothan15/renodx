@@ -1,7 +1,6 @@
-// ---- Created with 3Dmigoto v1.3.16 on Wed Nov 26 20:49:47 2025
+// ---- Created with 3Dmigoto v1.3.16 on Thu Jan 22 01:56:42 2026
 
-// Lutbuilder - not being used right now but included for completeness
-#include "../shared.h"
+// main uberpost 
 
 Texture2D<float4> t7 : register(t7);
 
@@ -41,6 +40,7 @@ void main(
   float4 r0,r1,r2,r3,r4,r5;
   uint4 bitmask, uiDest;
   float4 fDest;
+
   r0.yz = -cb0[2].yz + v1.xy;
   r1.x = cb0[2].x * r0.y;
   r0.x = frac(r1.x);
@@ -217,9 +217,6 @@ void main(
   r0.x = 1 + -r0.x;
   r0.x = 1 / r0.x;
   o0.xyz = r1.xyz * r0.xxx;
-
-  // Add ToneMapPass and output
-  // o0.xyz = renodx::draw::ToneMapPass(o0.xyz);
   o0.w = 1;
   return;
 }
