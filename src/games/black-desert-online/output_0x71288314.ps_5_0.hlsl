@@ -248,8 +248,8 @@ void main(
   o0.xyz = graded_sdr;
   if (RENODX_TONE_MAP_TYPE != 0.f) {
     const float3 graded_linear = renodx::color::srgb::DecodeSafe(graded_sdr);
-    o0.xyz = renodx::draw::ToneMapPass(linear_untonemapped, graded_linear);
-    o0.xyz = renodx::draw::RenderIntermediatePass(o0.xyz);
+    float3 tonemapped = renodx::draw::ToneMapPass(linear_untonemapped, graded_linear);
+    o0.xyz = renodx::draw::RenderIntermediatePass(tonemapped);
     o0.xyz = renodx::effects::ApplyFilmGrain(
         o0.xyz,
         v1.xy,

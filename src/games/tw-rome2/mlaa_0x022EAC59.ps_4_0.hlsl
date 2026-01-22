@@ -1,3 +1,5 @@
+#include "./shared.h"
+
 // Edge-aware post-processing resolve generated from 3Dmigoto capture.
 // The shader blends the current pixel with its neighbours when the
 // hardware-provided edge classification textures request additional
@@ -288,5 +290,11 @@ void main(
   } else {
     o0.xyzw = r1.xyzw;
   }
+  
+  // === HDR TONEMAPPING ===
+  if (RENODX_TONE_MAP_TYPE != 0) {
+    o0.rgb = renodx::draw::ToneMapPass(o0.rgb);
+  }
+  
   return;
 }

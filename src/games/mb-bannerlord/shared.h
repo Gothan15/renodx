@@ -14,36 +14,34 @@
 // #define RENODX_TONE_MAP_HIGHLIGHT_SATURATION   1.f
 // #define RENODX_TONE_MAP_BLOWOUT                0
 // #define RENODX_TONE_MAP_FLARE                  0
-#define RENODX_TONE_MAP_HUE_CORRECTION            0.f  // Handled manually in output shader
+// #define RENODX_SWAP_CHAIN_SCALING_NITS         RENODX_GRAPHICS_WHITE_NITS
+// #define RENODX_SWAP_CHAIN_CLAMP_NITS           RENODX_PEAK_WHITE_NITS
+// #define RENODX_INTERMEDIATE_SCALING            (RENODX_DIFFUSE_WHITE_NITS / RENODX_GRAPHICS_WHITE_NITS)
+#define RENODX_TONE_MAP_HUE_CORRECTION            0.f  
 #define RENODX_TONE_MAP_HUE_SHIFT                 0.f
 #define RENODX_TONE_MAP_WORKING_COLOR_SPACE       color::convert::COLOR_SPACE_BT709
 #define RENODX_TONE_MAP_CLAMP_COLOR_SPACE         color::convert::COLOR_SPACE_NONE
 #define RENODX_TONE_MAP_CLAMP_PEAK                color::convert::COLOR_SPACE_NONE
 #define RENODX_TONE_MAP_HUE_PROCESSOR             HUE_PROCESSOR_OKLAB
 #define RENODX_TONE_MAP_PER_CHANNEL               0
-// #define RENODX_GAMMA_CORRECTION                GAMMA_CORRECTION_GAMMA_2_2
-// #define RENODX_INTERMEDIATE_SCALING            (RENODX_DIFFUSE_WHITE_NITS / RENODX_GRAPHICS_WHITE_NITS)
-// #define RENODX_INTERMEDIATE_ENCODING           (RENODX_GAMMA_CORRECTION + 1.f)
+#define RENODX_GAMMA_CORRECTION                   shader_injection.gamma_correction
+#define RENODX_SWAP_CHAIN_GAMMA_CORRECTION        shader_injection.swap_chain_gamma_correction
 #define RENODX_INTERMEDIATE_ENCODING              (RENODX_GAMMA_CORRECTION + 1.f)
-// #define RENODX_INTERMEDIATE_COLOR_SPACE        color::convert::COLOR_SPACE_BT709
-#define RENODX_SWAP_CHAIN_DECODING                2.f  // Force 2.2 decoding
-// #define RENODX_SWAP_CHAIN_DECODING_COLOR_SPACE RENODX_INTERMEDIATE_COLOR_SPACE
-#define RENODX_SWAP_CHAIN_CUSTOM_COLOR_SPACE      COLOR_SPACE_CUSTOM_BT709D65
-// #define RENODX_SWAP_CHAIN_SCALING_NITS         RENODX_GRAPHICS_WHITE_NITS
-// #define RENODX_SWAP_CHAIN_CLAMP_NITS           RENODX_PEAK_WHITE_NITS
+#define RENODX_INTERMEDIATE_COLOR_SPACE           color::convert::COLOR_SPACE_BT709
+#define RENODX_SWAP_CHAIN_DECODING                RENODX_INTERMEDIATE_ENCODING
+#define RENODX_SWAP_CHAIN_DECODING_COLOR_SPACE    RENODX_INTERMEDIATE_COLOR_SPACE
+#define RENODX_SWAP_CHAIN_CUSTOM_COLOR_SPACE      shader_injection.swap_chain_custom_color_space
 #define RENODX_SWAP_CHAIN_CLAMP_COLOR_SPACE       color::convert::COLOR_SPACE_BT2020
 #define RENODX_SWAP_CHAIN_ENCODING                ENCODING_SCRGB
 #define RENODX_SWAP_CHAIN_ENCODING_COLOR_SPACE    color::convert::COLOR_SPACE_BT709
-#define RENODX_RENO_DRT_TONE_MAP_METHOD           renodx::tonemap::renodrt::config::tone_map_method::HERMITE_SPLINE
+#define RENODX_RENO_DRT_TONE_MAP_METHOD           renodx::tonemap::renodrt::config::tone_map_method::REINHARD
 #define CUSTOM_GRAIN_STRENGTH                     shader_injection.custom_grain_strength
 #define CUSTOM_BLOOM_STRENGTH                     shader_injection.custom_bloom_strength
-#define CUSTOM_VIGNETTE_STRENGTH                  shader_injection.custom_vignette_strength
-#define CUSTOM_AUTO_EXPOSURE_STRENGTH             shader_injection.custom_auto_exposure_strength
-#define CUSTOM_DISABLE_AUTO_EXPOSURE              shader_injection.custom_disable_auto_exposure
-#define CUSTOM_UI_VISIBLE                         shader_injection.custom_ui_visible
+#define CUSTOM_FILM_GRAIN_TYPE                    shader_injection.custom_film_grain_type
 #define CUSTOM_RANDOM                             shader_injection.custom_random
-#define CUSTOM_SHARPNESS                          shader_injection.custom_sharpness
-#define RENODX_WORLD_MAP_EXPOSURE                 shader_injection.worldmap_exposure
+#define CUSTOM_AUTO_EXPOSURE                      shader_injection.custom_auto_exposure
+#define CUSTOM_SUN_INTENSITY                      shader_injection.custom_sun_intensity
+
 
 // Must be 32bit aligned
 // Should be 4x32
@@ -81,16 +79,13 @@ struct ShaderInjectData {
   float swap_chain_clamp_color_space;
   float swap_chain_encoding;
   float swap_chain_encoding_color_space;
+  float custom_flip_uv_y;
   float custom_grain_strength;
+  float custom_film_grain_type;
   float custom_bloom_strength;
-  float custom_vignette_strength;
-  float custom_auto_exposure_strength;
-  float custom_disable_auto_exposure;
-  float custom_ui_visible;
-  float worldmap_exposure;
   float custom_random;
-  float custom_sharpness;
-  float padding_custom_effects[4];
+  float custom_auto_exposure;
+  float custom_sun_intensity;
 };
 
 #ifndef __cplusplus
@@ -102,25 +97,19 @@ cbuffer shader_injection : register(b13) {
   ShaderInjectData shader_injection : packoffset(c0);
 }
 
-#define RENODX_TONE_MAP_TYPE                 shader_injection.tone_map_type
-#define RENODX_PEAK_WHITE_NITS               shader_injection.peak_white_nits
-#define RENODX_DIFFUSE_WHITE_NITS            shader_injection.diffuse_white_nits
-#define RENODX_GRAPHICS_WHITE_NITS           shader_injection.graphics_white_nits
-#define RENODX_GAMMA_CORRECTION              shader_injection.gamma_correction
-#define RENODX_TONE_MAP_EXPOSURE             shader_injection.tone_map_exposure
-#define RENODX_TONE_MAP_HIGHLIGHTS           shader_injection.tone_map_highlights
-#define RENODX_TONE_MAP_SHADOWS              shader_injection.tone_map_shadows
-#define RENODX_TONE_MAP_CONTRAST             shader_injection.tone_map_contrast
-#define RENODX_TONE_MAP_SATURATION           shader_injection.tone_map_saturation
-#define RENODX_TONE_MAP_HIGHLIGHT_SATURATION shader_injection.tone_map_highlight_saturation
-#define RENODX_TONE_MAP_BLOWOUT              shader_injection.tone_map_blowout
-#define RENODX_TONE_MAP_FLARE                shader_injection.tone_map_flare
-#define RENODX_COLOR_GRADE_STRENGTH          shader_injection.color_grade_strength
-#define RENODX_SWAP_CHAIN_GAMMA_CORRECTION   shader_injection.swap_chain_gamma_correction
-// #define RENODX_SWAP_CHAIN_DECODING_COLOR_SPACE shader_injection.swap_chain_decoding_color_space
-// #define RENODX_SWAP_CHAIN_SCALING_NITS         shader_injection.swap_chain_scaling_nits
-// #define RENODX_SWAP_CHAIN_CLAMP_NITS           shader_injection.swap_chain_clamp_nits
-#define RENODX_SWAP_CHAIN_CLAMP_NITS              RENODX_PEAK_WHITE_NITS
+#define RENODX_TONE_MAP_TYPE                      shader_injection.tone_map_type
+#define RENODX_PEAK_WHITE_NITS                    shader_injection.peak_white_nits
+#define RENODX_DIFFUSE_WHITE_NITS                 shader_injection.diffuse_white_nits
+#define RENODX_GRAPHICS_WHITE_NITS                shader_injection.graphics_white_nits
+#define RENODX_TONE_MAP_EXPOSURE                  shader_injection.tone_map_exposure
+#define RENODX_TONE_MAP_HIGHLIGHTS                shader_injection.tone_map_highlights
+#define RENODX_TONE_MAP_SHADOWS                   shader_injection.tone_map_shadows
+#define RENODX_TONE_MAP_CONTRAST                  shader_injection.tone_map_contrast
+#define RENODX_TONE_MAP_SATURATION                shader_injection.tone_map_saturation
+#define RENODX_TONE_MAP_HIGHLIGHT_SATURATION      shader_injection.tone_map_highlight_saturation
+#define RENODX_TONE_MAP_BLOWOUT                   shader_injection.tone_map_blowout
+#define RENODX_TONE_MAP_FLARE                     shader_injection.tone_map_flare
+#define RENODX_COLOR_GRADE_STRENGTH               shader_injection.color_grade_strength
 
 #include "../../shaders/renodx.hlsl"
 
