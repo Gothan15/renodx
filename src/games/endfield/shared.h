@@ -83,6 +83,7 @@ struct ShaderInjectData {
   float ui_visibility;
   float sun_intensity;
   float bloom_strength;
+  float godrays_intensity;
 };
 
 #ifndef __cplusplus
@@ -135,6 +136,7 @@ cbuffer shader_injection : register(b13) {
 #define UI_VISIBILITY                          shader_injection.ui_visibility
 #define SUN_INTENSITY                          shader_injection.sun_intensity
 #define BLOOM_STRENGTH                         shader_injection.bloom_strength
+#define GODRAYS_INTENSITY                      shader_injection.godrays_intensity
 
 #include "../../shaders/renodx.hlsl"
 

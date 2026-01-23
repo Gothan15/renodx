@@ -102,7 +102,11 @@ void main(
   // cb1[9].xyz = sun color, cb1[9].w = sun intensity
   r3.x = saturate(dot(-cb1[11].xyz, -r1.yzw));  // Sun-view alignment (1 = looking at sun)
   r3.x = log2(r3.x);
-  r3.x = cb1[10].x * r3.x;   // Apply sun size exponent
+  
+  // Sun size adjustment: multiply exponent to shrink disk (5.0 = ~80% smaller)
+  float sunSizeMultiplier = (SUN_INTENSITY > 0.5f) ? 5.0f : 1.0f;
+  r3.x = cb1[10].x * sunSizeMultiplier * r3.x;   // Apply sun size exponent
+  
   r3.x = exp2(r3.x);
   r3.y = r3.x * r3.x + 1;    // Soft falloff numerator
   r3.x = -r3.x * 1.98000002 + 1.98010004;  // Soft falloff denominator
@@ -183,21 +187,52 @@ void main(
   
   // HDR Sun toggle
   if (SUN_INTENSITY > 0.5f) {
-    // Boost the sun intensity
+    // Calculate sun-view alignment (1 = looking directly at sun center)
+    float sunDot = saturate(dot(-cb1[11].xyz, -r1.yzw)); 
+    
+    // === HORIZON REDDENING ===
+    // Sun direction Y component indicates height (-1 = below, 0 = horizon, 1 = zenith)
+    float sunHeight = saturate(cb1[11].y + 0.1f);  // Shift so effect starts slightly above horizon
+    
+    // Warm shift when sun is low (more red/orange near horizon)
+    float3 horizonTint = lerp(float3(1.0f, 0.6f, 0.3f),   // Low sun: warm orange
+                              float3(1.0f, 0.95f, 0.9f),   // High sun: nearly white
+                              sunHeight);
+    
+    // === LIMB DARKENING ===
+    // Real stars appear darker at edges due to optical depth through atmosphere
+    // Use a soft power curve - center is brightest, edges darken
+    float limbDarkening = pow(sunDot, 0.4f);  // Subtle darkening toward edges
+    
+    // === CHROMATIC SUN EDGE ===
+    // Core is white-hot, edges transition to yellow/orange
+    float3 sunCoreColor = float3(1.0f, 1.0f, 1.0f);       // White-hot center
+    float3 sunEdgeColor = float3(1.0f, 0.85f, 0.6f);      // Warm yellow edge
+    
+    // Blend from edge color to core color based on how centered we are
+    float coreFactor = pow(sunDot, 3.0f);  // Sharp transition to white core
+    float3 chromaticColor = lerp(sunEdgeColor, sunCoreColor, coreFactor);
+    
+    // === COMBINE SUN DISK ===
+    // Apply limb darkening and chromatic color to base sun
+    r3.xzw = r3.xzw * limbDarkening * chromaticColor * horizonTint;
+    
+    // Boost the sun intensity for HDR
     r3.xzw = r3.xzw * 5.0f;
     
     // === CORONA GLOW ===
-    // Calculate glow around the sun
-    float sunDot = saturate(dot(-cb1[11].xyz, -r1.yzw)); 
-    
-    // Inner corona 
+    // Inner corona (tight glow)
     float coronaInner = pow(sunDot, 64.0f);
-    // Outer corona
+    // Outer corona (wide soft glow)
     float coronaOuter = pow(sunDot, 8.0f);
     
-    // Warm tint for corona
-    float3 coronaColorInner = float3(1.0f, 0.7f, 0.3f);  
-    float3 coronaColorOuter = float3(1.0f, 0.5f, 0.2f);  
+    // Corona colors - also affected by horizon
+    float3 coronaColorInner = lerp(float3(1.0f, 0.5f, 0.2f),   // Warm inner at horizon
+                                   float3(1.0f, 0.7f, 0.3f),    // Normal inner
+                                   sunHeight);
+    float3 coronaColorOuter = lerp(float3(1.0f, 0.3f, 0.1f),   // Deep orange at horizon
+                                   float3(1.0f, 0.5f, 0.2f),    // Normal outer
+                                   sunHeight);
     
     float3 corona = coronaInner * coronaColorInner * 2.0f 
                   + coronaOuter * coronaColorOuter * 0.5f;
@@ -209,8 +244,12 @@ void main(
     // Add corona to sun
     r3.xzw += corona;
     
+    // === DESATURATE SUN (50%) ===
+    float sunLuma = dot(r3.xzw, float3(0.2126f, 0.7152f, 0.0722f));
+    r3.xzw = lerp(r3.xzw, float3(sunLuma, sunLuma, sunLuma), 0.5f);
+    
     // === BLOOM BOOST ===
-    r3.xzw *= 1.5f;
+    r3.xzw *= 10.0f;
     
   } else {
     // Vanilla clamp
