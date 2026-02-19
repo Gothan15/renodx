@@ -32,6 +32,15 @@ renodx::mods::shader::CustomShaders custom_shaders = {
     CustomShaderEntry(0xF24CD19B), //sky-volumetric (light shafts)
     CustomShaderEntry(0xCCD66731), //postprocess (additional)
     CustomShaderEntry(0xE691A869), //auto-exposure
+    CustomShaderEntry(0x66D96DC8), //gtao-computation (small radius)
+    CustomShaderEntry(0xC2DAA4E8), //gtao-computation2 (large radius)
+
+    CustomShaderEntry(0x9D486B77), //deferred-lighting
+    CustomShaderEntry(0x77B920E0), //deferred-lighting
+    CustomShaderEntry(0x626C4194), //deferred-lighting
+    CustomShaderEntry(0xD0C1F854), //deferred-lighting
+    CustomShaderEntry(0xD2EE110D), //deferred-lighting
+    CustomShaderEntry(0xE18CA53F), //deferred-lighting
 
     // CustomShaderEntry(0x00000000),
     // CustomSwapchainShader(0x00000000),
@@ -116,7 +125,7 @@ renodx::utils::settings::Settings settings = {
         .key = "SwapChainGammaCorrection",
         .binding = &shader_injection.swap_chain_gamma_correction,
         .value_type = renodx::utils::settings::SettingValueType::INTEGER,
-        .default_value = 0.f,
+        .default_value = 1.f,
         .label = "UI Gamma Correction",
         .section = "Tone Mapping",
         .labels = {"None", "2.2", "2.4"},
@@ -185,7 +194,7 @@ renodx::utils::settings::Settings settings = {
     },
     new renodx::utils::settings::Setting{
         .key = "ColorGradeBlowout",
-        .binding = &shader_injection.tone_map_blowout,
+        .binding = &shader_injection.tone_map_dechroma,
         .default_value = 0.f,
         .label = "Blowout",
         .section = "Color Grading",
@@ -239,24 +248,42 @@ renodx::utils::settings::Settings settings = {
     new renodx::utils::settings::Setting({
         .key = "FxAutoExposure",
         .binding = &shader_injection.custom_auto_exposure,
-        .default_value = 100.f,
-        .label = "Auto Exposure",
+        .value_type = renodx::utils::settings::SettingValueType::BOOLEAN,
+        .default_value = 1.f,
+        .label = "Highlight-Aware Exposure",
         .section = "Effects",
-        .tooltip = "Controls auto-exposure intensity. 100% = full effect, 0% = neutral exposure",
-        .min = 0.f,
-        .max = 100.f,
-        .format = "%.0f",
-        .parse = [](float value) { return value * 0.01f; },
+        .tooltip = "Reduces auto-exposure strength on highlights to preserve bright detail",
         }),
 
     new renodx::utils::settings::Setting({
         .key = "FxSunIntensity",
         .binding = &shader_injection.custom_sun_intensity,
         .value_type = renodx::utils::settings::SettingValueType::BOOLEAN,
-        .default_value = 0.f,
+        .default_value = 1.f,
         .label = "HDR Sun",
         .section = "Effects",
         .tooltip = "Enables brighter and smaller sun disk for HDR",
+        }),
+    new renodx::utils::settings::Setting({
+        .key = "FxAoDebug",
+        .binding = &shader_injection.custom_ao_debug,
+        .value_type = renodx::utils::settings::SettingValueType::BOOLEAN,
+        .default_value = 0.f,
+        .label = "AO Debug View",
+        .section = "Effects",
+        .tooltip = "Visualizes the ambient occlusion buffer",
+        .is_visible = []() { return current_settings_mode >= 2; },
+        }),
+
+    new renodx::utils::settings::Setting({
+        .key = "FxAoBypass",
+        .binding = &shader_injection.custom_ao_bypass,
+        .value_type = renodx::utils::settings::SettingValueType::BOOLEAN,
+        .default_value = 0.f,
+        .label = "Disable AO",
+        .section = "Effects",
+        .tooltip = "Bypasses ambient occlusion application entirely",
+        .is_visible = []() { return current_settings_mode >= 1; },
         }),
 
     new renodx::utils::settings::Setting{
@@ -317,17 +344,21 @@ renodx::utils::settings::Settings settings = {
     },
     new renodx::utils::settings::Setting{
         .value_type = renodx::utils::settings::SettingValueType::TEXT,
-        .label = std::string("- Thanks to Musa for helping solve game UI one liner issue"),
+        .label = std::string("- Thanks to Musa for helping solve game UI issue"),
         .section = "About",
     },
 };
 
 void OnPresetOff() {
-  //   renodx::utils::settings::UpdateSetting("toneMapType", 0.f);
-  //   renodx::utils::settings::UpdateSetting("toneMapPeakNits", 203.f);
-  //   renodx::utils::settings::UpdateSetting("toneMapGameNits", 203.f);
-  //   renodx::utils::settings::UpdateSetting("toneMapUINits", 203.f);
-  //   renodx::utils::settings::UpdateSetting("toneMapGammaCorrection", 0);
+       renodx::utils::settings::UpdateSetting("ToneMapType", 0.f);
+       renodx::utils::settings::UpdateSetting("ToneMapPeakNits", 203.f);
+       renodx::utils::settings::UpdateSetting("ToneMapGameNits", 203.f);
+       renodx::utils::settings::UpdateSetting("ToneMapUINits", 203.f);
+       renodx::utils::settings::UpdateSetting("ToneMapGammaCorrection", 1);
+       renodx::utils::settings::UpdateSetting("GammaCorrection", 1);
+       renodx::utils::settings::UpdateSetting("FxGrainStrength", 0);
+       renodx::utils::settings::UpdateSetting("FxAutoExposure", 0);
+       renodx::utils::settings::UpdateSetting("FxSunIntensity", 0);
   //   renodx::utils::settings::UpdateSetting("colorGradeExposure", 1.f);
   //   renodx::utils::settings::UpdateSetting("colorGradeHighlights", 50.f);
   //   renodx::utils::settings::UpdateSetting("colorGradeShadows", 50.f);
