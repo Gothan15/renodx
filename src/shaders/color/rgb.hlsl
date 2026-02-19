@@ -79,6 +79,12 @@ static const float3x3 XYZ_TO_CAT97_LMS_MAT = float3x3(
     -0.8360f, +1.8327f, +0.0033f,
     +0.0357f, -0.0469f, +1.0112f);
 
+// Manually recomputed from CIE 1931 XYZ 1nm to Stockman 2deg 1nm 8dp with MB2 Weights
+float3x3 XYZ_TO_STOCKMAN_SHARP_LMS_MAT = float3x3(
+    0.185082982238733f, 0.584081279463687f, -0.0240722415044404f,
+    -0.134433056469973f, 0.405752392775348f, 0.0358252602217631f,
+    0.000789456671966863f, -0.000912281325916184f, 0.0198490812339463f);
+
 // Stockman & Sharpe 2 degree
 static const float3x3 XYZf_TO_STOCKMAN_SHARP_LMS_MAT = float3x3(
     1.94735469f, -1.41445123f, 0.36476327f,
@@ -230,6 +236,10 @@ float3 BT709(float3 bt709) {
   return mul(BT709_TO_XYZ_MAT, bt709);
 }
 
+float3 BT2020(float3 bt2020) {
+  return mul(BT2020_TO_XYZ_MAT, bt2020);
+}
+
 }  // namespace from
 }  // namespace xyz
 
@@ -310,6 +320,10 @@ float3 AP1(float3 ap1) {
   return mul(AP1_TO_BT2020_MAT, ap1);
 }
 
+float3 XYZ(float3 XYZ) {
+  return mul(XYZ_TO_BT2020_MAT, XYZ);
+}
+
 }  // namespace from
 }  // namespace bt2020
 
@@ -327,18 +341,23 @@ float3 BT2020(float3 bt2020) {
 
 namespace y {
 namespace from {
+
+float XYZMatrix(float3 color, float3x3 toXYZMatrix) {
+  return dot(color, toXYZMatrix[1].rgb);
+}
+
 float NTSC1953(float3 ntsc) {
-  return dot(ntsc, NTSC_U_1953_TO_XYZ_MAT[1].rgb);
+  return XYZMatrix(ntsc, NTSC_U_1953_TO_XYZ_MAT);
 }
 
 float BT709(float3 bt709) {
-  return dot(bt709, BT709_TO_XYZ_MAT[1].rgb);
+  return XYZMatrix(bt709, BT709_TO_XYZ_MAT);
 }
 float BT2020(float3 bt2020) {
-  return dot(bt2020, BT2020_TO_XYZ_MAT[1].rgb);
+  return XYZMatrix(bt2020, BT2020_TO_XYZ_MAT);
 }
 float AP1(float3 ap1) {
-  return dot(ap1, AP1_TO_XYZ_MAT[1].rgb);
+  return XYZMatrix(ap1, AP1_TO_XYZ_MAT);
 }
 }  // namespace from
 }  // namespace y

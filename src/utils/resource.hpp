@@ -78,6 +78,28 @@ const std::unordered_map<
         ViewUpgradeAll(b8g8r8a8_unorm_srgb, r11g11b10_float),
 };
 
+const std::unordered_map<
+    std::pair<reshade::api::resource_usage, reshade::api::format>,
+    reshade::api::format, utils::hash::HashPair>
+    VIEW_UPGRADES_R9G9B9E5 = {
+        ViewUpgradeAll(r16g16b16a16_typeless, r9g9b9e5),
+        ViewUpgradeAll(r10g10b10a2_typeless, r9g9b9e5),
+        ViewUpgradeAll(r8g8b8a8_typeless, r9g9b9e5),
+        ViewUpgradeAll(r16g16b16a16_float, r9g9b9e5),
+        ViewUpgradeAll(r16g16b16a16_unorm, r9g9b9e5),
+        ViewUpgradeAll(r16g16b16a16_snorm, r9g9b9e5),
+        ViewUpgradeAll(r10g10b10a2_unorm, r9g9b9e5),
+        ViewUpgradeAll(b10g10r10a2_unorm, r9g9b9e5),
+        ViewUpgradeAll(r8g8b8a8_unorm, r9g9b9e5),
+        ViewUpgradeAll(b8g8r8a8_unorm, r9g9b9e5),
+        ViewUpgradeAll(r8g8b8a8_snorm, r9g9b9e5),
+        ViewUpgradeAll(r8g8b8a8_unorm_srgb, r9g9b9e5),
+        ViewUpgradeAll(b8g8r8a8_unorm_srgb, r9g9b9e5),
+        ViewUpgradeAll(r11g11b10_float, r9g9b9e5),
+        ViewUpgradeAll(r9g9b9e5, r9g9b9e5),
+};
+
+
 #undef ViewUpgrade
 #undef ViewUpgradeAll
 
@@ -306,6 +328,22 @@ inline ResourceViewInfo* GetResourceViewInfoUnsafe(const reshade::api::resource_
   return data;
 }
 
+// Insert a ResourceViewInfo entry, or reuse an existing one. When reusing,
+// optionally assert that the existing entry was destroyed.
+inline std::pair<ResourceViewInfo*, bool> EmplaceResourceViewInfoOrReuse(
+    const reshade::api::resource_view& view,
+    const ResourceViewInfo& info,
+    const bool require_destroyed) {
+  auto [it, inserted] = store->resource_view_infos.try_emplace_p(view.handle, info);
+  if (!inserted) {
+    if (require_destroyed) {
+      assert(it->second.destroyed && "ResourceViewInfo reused but it was not destroyed.");
+    }
+    it->second = info;
+  }
+  return {&it->second, inserted};
+}
+
 struct __declspec(uuid("3c7a0a1f-4bf3-4e7a-ac02-6f63fdc70187")) DeviceData {
   Store* store;
 };
@@ -317,7 +355,7 @@ static void OnInitDevice(reshade::api::device* device) {
   if (created) {
     std::stringstream s;
     s << "utils::resource::OnInitDevice(Hooking device: ";
-    s << reinterpret_cast<uintptr_t>(device);
+    s << PRINT_PTR(reinterpret_cast<uintptr_t>(device));
     s << ", api: " << device->get_api();
     s << ")";
     reshade::log::message(reshade::log::level::debug, s.str().c_str());
@@ -327,7 +365,7 @@ static void OnInitDevice(reshade::api::device* device) {
   } else {
     std::stringstream s;
     s << "utils::resource::OnInitDevice(Attaching to hook: ";
-    s << reinterpret_cast<uintptr_t>(device);
+    s << PRINT_PTR(reinterpret_cast<uintptr_t>(device));
     s << ", api: " << device->get_api();
     s << ")";
     reshade::log::message(reshade::log::level::debug, s.str().c_str());
@@ -582,6 +620,10 @@ inline reshade::api::resource_view_desc PopulateUnknownResourceViewDesc(
     ResourceInfo* resource_info) {
   reshade::api::resource_view_desc new_desc = desc;
   switch (device->get_api()) {
+    case reshade::api::device_api::d3d9:
+      // DX9 will always be unknown. Games may used special Nvidia types or 'NULL'
+      return new_desc;
+    case reshade::api::device_api::d3d10:
     case reshade::api::device_api::d3d11:
       // Set this parameter to NULL to create a view that accesses the entire
       // resource (using the format the resource was created with).
