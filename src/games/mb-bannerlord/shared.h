@@ -65,6 +65,8 @@ struct ShaderInjectData {
   float custom_ao_debug;
   float custom_ao_bypass;
   float improved_gtao;
+  float custom_probe_modulation;
+  float custom_burley_diffuse;
 };
 
 #ifndef __cplusplus
@@ -116,6 +118,8 @@ cbuffer shader_injection : register(b13) {
 #define CUSTOM_SUN_INTENSITY                      shader_injection.custom_sun_intensity
 #define CUSTOM_AO_DEBUG                           shader_injection.custom_ao_debug
 #define CUSTOM_AO_BYPASS                          shader_injection.custom_ao_bypass
+#define CUSTOM_PROBE_MODULATION                   shader_injection.custom_probe_modulation
+#define CUSTOM_BURLEY_DIFFUSE                     shader_injection.custom_burley_diffuse
 
 #include "../../shaders/renodx.hlsl"
 

@@ -1,4 +1,4 @@
-#include "./shared.h"
+#include "../shared.h"
 
 // ---- Created with 3Dmigoto v1.4.1 on Fri Oct 31 00:53:02 2025
 
@@ -59,5 +59,14 @@ void main(
     result += SampleWeightedTap(tap_uvs[i], SampleWeights[i]);
   }
 
-  o0 = result * CUSTOM_BLOOM_STRENGTH;
+  float3 bloom_color = result.rgb * CUSTOM_BLOOM_STRENGTH;
+
+  // Reduce bloom contribution in dark areas to prevent raised black floor
+  float mid_gray_bloomed = (0.18 + renodx::color::y::from::BT709(bloom_color)) / 0.18;
+  float scene_luminance = renodx::color::y::from::BT709(bloom_color) * mid_gray_bloomed;
+  float bloom_blend = saturate(smoothstep(0.f, 0.18f, scene_luminance));
+  float3 bloom_scaled = lerp(0.f, bloom_color, bloom_blend);
+  bloom_color = lerp(bloom_color, bloom_scaled, CUSTOM_BLOOM_SCALING * 0.5f);
+
+  o0 = float4(bloom_color, result.a * CUSTOM_BLOOM_STRENGTH);
 }

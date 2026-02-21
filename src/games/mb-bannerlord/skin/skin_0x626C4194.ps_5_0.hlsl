@@ -2,6 +2,8 @@
 cbuffer cb13 : register(b13) {
   float custom_ao_debug : packoffset(c9.y);
   float custom_ao_bypass : packoffset(c9.z);
+  float custom_probe_modulation : packoffset(c10.x);
+  float custom_burley_diffuse : packoffset(c10.y);
 }
 
 struct t84_t {
@@ -196,6 +198,14 @@ void main(
     r4.xyz = r4.xyz + -r2.xyw;
     r2.xyw = r2.zzz * r4.xyz + r2.xyw;
   }
+  // Probe luminance modulation: attenuate diffuse probes in dark ambient areas
+  if (custom_probe_modulation > 0.0) {
+    float probeLum = dot(r2.xyw, float3(0.2126729, 0.7151522, 0.0721750));
+    probeLum = max(probeLum, 0.0);
+    float K = custom_probe_modulation * 50.0;
+    float modFactor = probeLum / (probeLum + K);
+    r2.xyw *= modFactor;
+  }
   r2.z = dot(float3(0.270000011,0.670000017,0.0599999987), r2.xyw);
   r2.xyw = r2.xyw / r2.zzz;
   r2.z = max(cb0[104].w, r2.z);
@@ -207,7 +217,19 @@ void main(
   r2.w = saturate(dot(r3.xyz, -cb0[2].xyz));
   r1.w = r2.w * r1.w;
   r4.xyz = cb0[52].xyz * r1.www;
-  r4.xyz = float3(0.318309873,0.318309873,0.318309873) * r4.xyz;
+  // Burley (Disney) diffuse BRDF — replaces Lambertian 1/pi (roughness ~0.5 approximation)
+  if (custom_burley_diffuse) {
+    float3 burley_V = normalize(cb0[1].xzy - r0.xzy);
+    float burley_LdotH2 = 0.5 + 0.5 * dot(-cb0[2].xyz, burley_V);
+    float burley_NdotV = saturate(dot(r3.xyz, burley_V));
+    float burley_NdotL = r2.w;
+    float burley_FD90 = 0.5 + 2.0 * 0.5 * burley_LdotH2;
+    float burley_sl = 1.0 + (burley_FD90 - 1.0) * pow(1.0 - burley_NdotL, 5.0);
+    float burley_sv = 1.0 + (burley_FD90 - 1.0) * pow(1.0 - burley_NdotV, 5.0);
+    r4.xyz = float3(0.318309873,0.318309873,0.318309873) * r4.xyz * (burley_sl * burley_sv);
+  } else {
+    r4.xyz = float3(0.318309873,0.318309873,0.318309873) * r4.xyz;
+  }
   r2.xyz = r2.xyz * r1.zzz + r4.xyz;
   r1.z = cmp(0 < cb0[57].x);
   if (r1.z != 0) {
@@ -453,11 +475,24 @@ void main(
           }
         }
         r6.xyz = r6.xyz / r5.www;
+        float3 burley_localL = r6.xyz;  // save normalized light direction
         r3.w = saturate(dot(r6.xyz, r3.xyz));
         r3.w = r3.w * r8.x;
         r6.xyz = r3.www * r7.yzw;
         r6.xyz = r6.xyz * r7.xxx;
-        r6.xyz = float3(0.318309873,0.318309873,0.318309873) * r6.xyz;
+        // Burley (Disney) diffuse BRDF — replaces Lambertian 1/pi (roughness ~0.5 approximation)
+        if (custom_burley_diffuse) {
+          float3 burley_V = normalize(cb0[1].xzy - r0.xzy);
+          float burley_LdotH2 = 0.5 + 0.5 * dot(burley_localL, burley_V);
+          float burley_NdotV = saturate(dot(r3.xyz, burley_V));
+          float burley_NdotL = saturate(dot(burley_localL, r3.xyz));
+          float burley_FD90 = 0.5 + 2.0 * 0.5 * burley_LdotH2;
+          float burley_sl = 1.0 + (burley_FD90 - 1.0) * pow(1.0 - burley_NdotL, 5.0);
+          float burley_sv = 1.0 + (burley_FD90 - 1.0) * pow(1.0 - burley_NdotV, 5.0);
+          r6.xyz = float3(0.318309873,0.318309873,0.318309873) * r6.xyz * (burley_sl * burley_sv);
+        } else {
+          r6.xyz = float3(0.318309873,0.318309873,0.318309873) * r6.xyz;
+        }
       } else {
         r6.xyz = float3(0,0,0);
       }

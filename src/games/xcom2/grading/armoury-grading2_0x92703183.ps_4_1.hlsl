@@ -1,6 +1,5 @@
-#include "./shared.h"
-
-// ---- Created with 3Dmigoto v1.4.1 on Sat Oct  4 22:46:14 2025
+#include "../common.hlsl"
+// ---- Created with 3Dmigoto v1.4.1 on Sat Oct  4 13:35:40 2025
 
 cbuffer _Globals : register(b0)
 {
@@ -40,13 +39,11 @@ cbuffer _Globals : register(b0)
 SamplerState SceneColorTexture_s : register(s0);
 SamplerState ColorGradingLUT_s : register(s1);
 SamplerState FilterColor1Texture_s : register(s2);
-SamplerState DirtyLensTexture_s : register(s3);
-SamplerState LowResPostProcessBuffer_s : register(s4);
+SamplerState LowResPostProcessBuffer_s : register(s3);
 Texture2D<float4> SceneColorTexture : register(t0);
 Texture2D<float4> LowResPostProcessBuffer : register(t1);
 Texture2D<float4> FilterColor1Texture : register(t2);
-Texture2D<float4> DirtyLensTexture : register(t3);
-Texture2D<float4> ColorGradingLUT : register(t4);
+Texture2D<float4> ColorGradingLUT : register(t3);
 
 
 // 3Dmigoto declarations
@@ -71,12 +68,12 @@ void main(
   r0.xyzw = -r1.zzxy * float4(4,4,4,4) + r0.xyzw;
   r2.xyzw = float4(4,4,4,4) * r1.zzxy;
   r0.xyzw = r1.wwww * r0.xyzw + r2.xyzw;
-  r1.xy = DirtyLensValues.yz * v1.xy;
-  r1.xyz = DirtyLensTexture.Sample(DirtyLensTexture_s, r1.xy).xyz;
-  r1.xyzw = DirtyLensValues.xxxx * r1.zzxy + BloomTintAndScreenBlendThreshold.zzxy;
-  r2.xyz = FilterColor1Texture.Sample(FilterColor1Texture_s, v0.zw).xyz;
-  r0.xyzw = r2.zzxy * r1.xyzw + r0.xyzw;
+  r1.xyz = FilterColor1Texture.Sample(FilterColor1Texture_s, v0.zw).xyz;
+  r0.xyzw = r1.zzxy * BloomTintAndScreenBlendThreshold.zzxy + r0.xyzw;
   const float3 linear_untonemapped = r0.zwy;
+  float max_channel = max(r0.z, max(r0.w, r0.y));
+  max_channel = max(max_channel, 1.0);
+  r0.xyzw /= max_channel;
   r1.x = 1 + ImageAdjustments2.x;
   r2.xyzw = r0.yyzw * r1.xxxx + -ImageAdjustments2.yyyy;
   r2.xyzw = r2.xyzw * float4(6.19999981,6.19999981,6.19999981,6.19999981) + float4(0.5,0.5,0.5,0.5);
@@ -97,17 +94,21 @@ void main(
   r0.xyz = r0.xxx * r0.yzw + r1.xyz;
   o0.w = dot(r0.xyz, float3(0.298999995,0.587000012,0.114));
   o0.xyz = r0.xyz;
-  if (RENODX_TONE_MAP_TYPE != 0.f) {
-    o0.xyz = renodx::color::srgb::DecodeSafe(o0.xyz);  
-    o0.xyz = renodx::draw::ToneMapPass(linear_untonemapped, o0.xyz);
+  float3 lut_linear = renodx::color::srgb::DecodeSafe(r0.xyz) * max_channel;
+  LUTSampleResult lut_sample = BuildLUTResult(lut_linear, linear_untonemapped);
+  [branch]
+  if (RENODX_TONE_MAP_TYPE == 0.f) {
+    o0.xyz = SDRGRADE(lut_sample);
+  } else {
+    o0.xyz = HDRGRADE(lut_sample);
+  }
+  if (CUSTOM_GRAIN_STRENGTH > 0) {
     o0.xyz = renodx::effects::ApplyFilmGrain(
         o0.xyz,
         v0.xy,
         CUSTOM_RANDOM,
         CUSTOM_GRAIN_STRENGTH * 0.03f);
-    o0.xyz = renodx::draw::RenderIntermediatePass(o0.xyz);
-  } else {
-    o0.xyz = saturate(o0.xyz);
   }
+  o0.xyz = renodx::draw::RenderIntermediatePass(o0.xyz);
   return;
 }

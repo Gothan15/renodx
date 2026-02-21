@@ -1,6 +1,6 @@
-#include "./shared.h"
+#include "../common.hlsl"
 
-// ---- Created with 3Dmigoto v1.4.1 on Thu Oct  2 19:21:35 2025
+// ---- Created with 3Dmigoto v1.4.1 on Sun Oct  5 00:09:43 2025
 
 cbuffer _Globals : register(b0)
 {
@@ -54,14 +54,18 @@ cbuffer PSOffsetConstants : register(b2)
 
 SamplerState SceneDepthTexture_s : register(s0);
 SamplerState SceneColorTexture_s : register(s1);
-SamplerState FilterColor1Texture_s : register(s2);
-SamplerState BokehDOFLayerTexture_s : register(s3);
-SamplerState LowResPostProcessBuffer_s : register(s4);
+SamplerState ColorGradingLUT_s : register(s2);
+SamplerState FilterColor1Texture_s : register(s3);
+SamplerState BokehDOFLayerTexture_s : register(s4);
+SamplerState DirtyLensTexture_s : register(s5);
+SamplerState LowResPostProcessBuffer_s : register(s6);
 Texture2D<float4> SceneColorTexture : register(t0);
 Texture2D<float4> SceneDepthTexture : register(t1);
 Texture2D<float4> LowResPostProcessBuffer : register(t2);
 Texture2D<float4> BokehDOFLayerTexture : register(t3);
 Texture2D<float4> FilterColor1Texture : register(t4);
+Texture2D<float4> DirtyLensTexture : register(t5);
+Texture2D<float4> ColorGradingLUT : register(t6);
 
 
 // 3Dmigoto declarations
@@ -80,10 +84,9 @@ void main(
 
   r0.x = SceneDepthTexture.SampleLevel(SceneDepthTexture_s, v1.xy, 0).x;
   r0.y = r0.x * MinZ_MaxZRatio.z + -MinZ_MaxZRatio.w;
+  r0.x = cmp(0.999000013 < r0.x);
   r0.y = 1 / r0.y;
-  r0.z = cmp(0.999000013 < r0.x);
-  o0.w = r0.x;
-  r0.x = r0.z ? 1000000 : r0.y;
+  r0.x = r0.x ? 1000000 : r0.y;
   r0.x = -PackedParameters.x + r0.x;
   r0.y = saturate(PackedParameters.y * abs(r0.x));
   r0.x = cmp(r0.x < 0);
@@ -102,14 +105,14 @@ void main(
   r1.xyz = r1.xyz / r0.www;
   r0.w = saturate(DOFKernelSize.y * r1.w);
   r2.xyz = SceneColorTexture.SampleLevel(SceneColorTexture_s, v1.xy, 0).xyz;
-  r2.xyz = r2.xyz;
+  r2.xyzw = r2.zzxy;
   r3.xyzw = LowResPostProcessBuffer.Sample(LowResPostProcessBuffer_s, r0.yz).xyzw;
-  r2.xyz = -r3.xyz * float3(4,4,4) + r2.xyz;
-  r3.xyz = float3(4,4,4) * r3.xyz;
-  r2.xyz = r3.www * r2.xyz + r3.xyz;
-  r1.xyz = -r2.xyz + r1.xyz;
-  r1.xyz = r0.www * r1.xyz + r2.xyz;
-  r3.xyz = r2.xyz + -r1.xyz;
+  r2.xyzw = -r3.zzxy * float4(4,4,4,4) + r2.xyzw;
+  r4.xyzw = float4(4,4,4,4) * r3.zzxy;
+  r2.xyzw = r3.wwww * r2.xyzw + r4.xyzw;
+  r1.xyz = -r2.zwy + r1.xyz;
+  r1.xyz = r0.www * r1.xyz + r2.zwy;
+  r3.xyz = r2.zwy + -r1.xyz;
   r1.w = 0;
   r3.w = 1;
   r1.xyzw = r0.xxxx * r3.xyzw + r1.xyzw;
@@ -117,13 +120,56 @@ void main(
   r0.xw = float2(0.5,1) * r0.yz;
   r4.xyz = FilterColor1Texture.Sample(FilterColor1Texture_s, r0.yz).xyz;
   r0.xyzw = BokehDOFLayerTexture.Sample(BokehDOFLayerTexture_s, r0.xw).xyzw;
-  r2.w = max(0.00100000005, r0.w);
-  r3.xyz = r0.xyz / r2.www;
+  r4.w = max(0.00100000005, r0.w);
+  r3.xyz = r0.xyz / r4.www;
   r0.x = saturate(DOFKernelSize.y * r0.w);
   r3.xyzw = r3.xyzw + -r1.xyzw;
   r0.xyzw = r0.xxxx * r3.xyzw + r1.xyzw;
-  r1.xyz = r2.xyz + -r0.xyz;
-  r0.xyz = r0.www * r1.xyz + r0.xyz;
-  o0.xyz = r4.xyz * BloomTintAndScreenBlendThreshold.xyz + r0.xyz;
+  r1.xyzw = r2.xyzw + -r0.zzxy;
+  r0.xyzw = r0.wwww * r1.xyzw + r0.zzxy;
+  r1.xy = DirtyLensValues.yz * v1.xy;
+  r1.xyz = DirtyLensTexture.Sample(DirtyLensTexture_s, r1.xy).xyz;
+  r1.xyzw = DirtyLensValues.xxxx * CUSTOM_DIRTY_LENS_STRENGTH * r1.zzxy + BloomTintAndScreenBlendThreshold.zzxy;
+  r0.xyzw = r4.zzxy * r1.xyzw + r0.xyzw;
+  const float3 linear_untonemapped = r0.zwy;
+  float max_channel = max(r0.z, max(r0.w, r0.y));
+  max_channel = max(max_channel, 1.0);
+  r0.xyzw /= max_channel;
+  r1.x = 1 + ImageAdjustments2.x;
+  r2.xyzw = r0.yyzw * r1.xxxx + -ImageAdjustments2.yyyy;
+  r2.xyzw = r2.xyzw * float4(6.19999981,6.19999981,6.19999981,6.19999981) + float4(0.5,0.5,0.5,0.5);
+  r3.xyzw = r0.yyzw * r1.xxxx + ImageAdjustments2.yyyy;
+  r0.xyzw = r1.xxxx * r0.xyzw;
+  r1.xyzw = r3.xyzw * r2.xyzw;
+  r2.xyzw = r0.yyzw * float4(6.19999981,6.19999981,6.19999981,6.19999981) + float4(1.70000005,1.70000005,1.70000005,1.70000005);
+  r0.xyzw = r0.xyzw * r2.xyzw + float4(0.0599999987,0.0599999987,0.0599999987,0.0599999987);
+  r0.xyzw = r1.xyzw / r0.xyzw;
+  r1.xyw = float3(14.9998999,0.9375,0.05859375) * r0.xwz;
+  r0.x = floor(r1.x);
+  r1.x = r0.x * 0.0625 + r1.w;
+  r1.xyzw = float4(0.001953125,0.03125,0.064453125,0.03125) + r1.xyxy;
+  r0.x = r0.y * 15 + -r0.x;
+  r0.yzw = ColorGradingLUT.Sample(ColorGradingLUT_s, r1.zw).xyz;
+  r1.xyz = ColorGradingLUT.Sample(ColorGradingLUT_s, r1.xy).xyz;
+  r0.yzw = -r1.xyz + r0.yzw;
+  r0.xyz = r0.xxx * r0.yzw + r1.xyz;
+  o0.w = dot(r0.xyz, float3(0.298999995,0.587000012,0.114));
+  o0.xyz = r0.xyz;
+  float3 lut_linear = renodx::color::srgb::DecodeSafe(r0.xyz) * max_channel;
+  LUTSampleResult lut_sample = BuildLUTResult(lut_linear, linear_untonemapped);
+  [branch]
+  if (RENODX_TONE_MAP_TYPE == 0.f) {
+    o0.xyz = SDRGRADE(lut_sample);
+  } else {
+    o0.xyz = HDRGRADE(lut_sample);
+  }
+  if (CUSTOM_GRAIN_STRENGTH > 0) {
+    o0.xyz = renodx::effects::ApplyFilmGrain(
+        o0.xyz,
+        v0.xy,
+        CUSTOM_RANDOM,
+        CUSTOM_GRAIN_STRENGTH * 0.03f);
+  }
+  o0.xyz = renodx::draw::RenderIntermediatePass(o0.xyz);
   return;
 }

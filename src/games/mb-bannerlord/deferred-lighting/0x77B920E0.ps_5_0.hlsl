@@ -2,6 +2,8 @@
 cbuffer cb13 : register(b13) {
   float custom_ao_debug : packoffset(c9.y);
   float custom_ao_bypass : packoffset(c9.z);
+  float custom_probe_modulation : packoffset(c10.x);
+  float custom_burley_diffuse : packoffset(c10.y);
 }
 
 struct t76_t {
@@ -825,6 +827,14 @@ void main(
     r12.xyz = r12.xyz + -r13.xyz;
     r13.xyz = r0.xxx * r12.xyz + r13.xyz;
   }
+  // Probe luminance modulation: attenuate specular probes in dark ambient areas
+  if (custom_probe_modulation > 0.0) {
+    float probeLum = dot(r13.xyz, float3(0.2126729, 0.7151522, 0.0721750));
+    probeLum = max(probeLum, 0.0);
+    float K = custom_probe_modulation * 50.0;
+    float modFactor = probeLum / (probeLum + K);
+    r0.yzw *= modFactor;
+  }
   r0.x = cmp(0 != cb0[101].x);
   if (r0.x != 0) {
     r4.w = t28.SampleLevel(s1_s, float2(0.5,0.5), 0).x;
@@ -877,7 +887,20 @@ void main(
   r13.xyz = r13.xyz * r1.xxx;
   r12.xyz = r13.xyz * r1.www + r12.xyz;
   r11.xyz = r11.xyz * r1.www + r12.xyz;
-  r6.xyz = r11.xyz * r6.xyz;
+  // Burley (Disney) diffuse BRDF — replaces Lambertian 1/pi
+  // Uses identity: LdotH^2 = (1 + L.V) / 2  to avoid computing H explicitly
+  if (custom_burley_diffuse) {
+    float burley_LdotH2 = 0.5 + 0.5 * dot(cb0[2].xyz, r8.xyz);  // (1 + L.V)/2
+    float burley_NdotV = saturate(dot(r4.xzy, -r8.xyz));
+    float burley_NdotL = r1.x;
+    float burley_roughness = r9.x;
+    float burley_FD90 = 0.5 + 2.0 * burley_roughness * burley_LdotH2;
+    float burley_sl = 1.0 + (burley_FD90 - 1.0) * pow(1.0 - burley_NdotL, 5.0);
+    float burley_sv = 1.0 + (burley_FD90 - 1.0) * pow(1.0 - burley_NdotV, 5.0);
+    r6.xyz = r11.xyz * r6.xyz * (burley_sl * burley_sv);
+  } else {
+    r6.xyz = r11.xyz * r6.xyz;
+  }
   r0.yzw = r6.xyz * float3(0.318309873,0.318309873,0.318309873) + r0.yzw;
   r3.yzw = -r7.xyz * r3.www + -cb0[2].xyz;
   r1.y = dot(r3.yzw, r3.yzw);

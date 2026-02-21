@@ -1,4 +1,4 @@
-#include "./shared.h"
+#include "../common.hlsl"
 
 // ---- Created with 3Dmigoto v1.4.1 on Thu Oct  2 00:35:07 2025
 
@@ -46,6 +46,9 @@ void main(
   r0.xyzw = -r0.zzxy * ColorScale.zzxy + OverlayColor.zzxy;
   r0.xyzw = OverlayColor.wwww * r0.xyzw + r1.xyzw;
   const float3 linear_untonemapped = r0.zwy;
+  float max_channel = max(r0.z, max(r0.w, r0.y));
+  max_channel = max(max_channel, 1.0);
+  r0.xyzw /= max_channel;
   r1.x = 1 + ImageAdjustments2.x;
   r2.xyzw = r0.yyzw * r1.xxxx + -ImageAdjustments2.yyyy;
   r2.xyzw = r2.xyzw * float4(6.19999981,6.19999981,6.19999981,6.19999981) + float4(0.5,0.5,0.5,0.5);
@@ -66,17 +69,21 @@ void main(
   r0.xyz = r0.xxx * r0.yzw + r1.xyz;
   o0.w = dot(r0.xyz, float3(0.298999995,0.587000012,0.114));
   o0.xyz = r0.xyz;
-  if (RENODX_TONE_MAP_TYPE != 0.f) {
-    o0.xyz = renodx::color::srgb::DecodeSafe(o0.xyz); 
-    o0.xyz = renodx::draw::ToneMapPass(linear_untonemapped, o0.xyz);
+  float3 lut_linear = renodx::color::srgb::DecodeSafe(r0.xyz) * max_channel;
+  LUTSampleResult lut_sample = BuildLUTResult(lut_linear, linear_untonemapped);
+  [branch]
+  if (RENODX_TONE_MAP_TYPE == 0.f) {
+    o0.xyz = SDRGRADE(lut_sample);
+  } else {
+    o0.xyz = HDRGRADE(lut_sample);
+  }
+  if (CUSTOM_GRAIN_STRENGTH > 0) {
     o0.xyz = renodx::effects::ApplyFilmGrain(
         o0.xyz,
         v0.xy,
         CUSTOM_RANDOM,
         CUSTOM_GRAIN_STRENGTH * 0.03f);
-    o0.xyz = renodx::draw::RenderIntermediatePass(o0.xyz);
-  } else {
-    o0.xyz = saturate(o0.xyz);
   }
+  o0.xyz = renodx::draw::RenderIntermediatePass(o0.xyz);
   return;
 }

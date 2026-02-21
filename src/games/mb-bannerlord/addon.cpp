@@ -23,30 +23,7 @@
 
 namespace {
 
-renodx::mods::shader::CustomShaders custom_shaders = {
-
-    CustomShaderEntry(0xC1EF5EF0), //output (highest)
-    CustomShaderEntry(0xB8C92C00), //output (low settings)
-    CustomShaderEntry(0xF331024C), //postprocess (highest)
-    CustomShaderEntry(0x675AE1F6), //postprocess (low settings)
-    CustomShaderEntry(0xF24CD19B), //sky-volumetric (light shafts)
-    CustomShaderEntry(0xCCD66731), //postprocess (additional)
-    CustomShaderEntry(0xE691A869), //auto-exposure
-    CustomShaderEntry(0x66D96DC8), //gtao-computation (small radius)
-    CustomShaderEntry(0xC2DAA4E8), //gtao-computation2 (large radius)
-
-    CustomShaderEntry(0x9D486B77), //deferred-lighting
-    CustomShaderEntry(0x77B920E0), //deferred-lighting
-    CustomShaderEntry(0x626C4194), //deferred-lighting
-    CustomShaderEntry(0xD0C1F854), //deferred-lighting
-    CustomShaderEntry(0xD2EE110D), //deferred-lighting
-    CustomShaderEntry(0xE18CA53F), //deferred-lighting
-
-    // CustomShaderEntry(0x00000000),
-    // CustomSwapchainShader(0x00000000),
-    // BypassShaderEntry(0x00000000),
-    // __ALL_CUSTOM_SHADERS
-};
+renodx::mods::shader::CustomShaders custom_shaders = {__ALL_CUSTOM_SHADERS};
 
 ShaderInjectData shader_injection;
 
@@ -286,6 +263,27 @@ renodx::utils::settings::Settings settings = {
         .is_visible = []() { return current_settings_mode >= 1; },
         }),
 
+    new renodx::utils::settings::Setting({
+        .key = "FxProbeModulation",
+        .binding = &shader_injection.custom_probe_modulation,
+        .default_value = 50.f,
+        .label = "Probe Modulation",
+        .section = "Effects",
+        .tooltip = "Controls how much specular probe reflections are attenuated in dark ambient areas.\n0 = Off, 100 = Maximum attenuation",
+        .max = 100.f,
+        .parse = [](float value) { return value * 0.01f; },
+        }),
+
+    new renodx::utils::settings::Setting({
+        .key = "FxBurleyDiffuse",
+        .binding = &shader_injection.custom_burley_diffuse,
+        .value_type = renodx::utils::settings::SettingValueType::BOOLEAN,
+        .default_value = 1.f,
+        .label = "Burley Diffuse",
+        .section = "Effects",
+        .tooltip = "Replaces the vanilla Lambertian (1/pi) diffuse BRDF with Disney/Burley diffuse for improved roughness-dependent shading",
+        }),
+
     new renodx::utils::settings::Setting{
         .key = "SwapChainCustomColorSpace",
         .binding = &shader_injection.swap_chain_custom_color_space,
@@ -359,6 +357,8 @@ void OnPresetOff() {
        renodx::utils::settings::UpdateSetting("FxGrainStrength", 0);
        renodx::utils::settings::UpdateSetting("FxAutoExposure", 0);
        renodx::utils::settings::UpdateSetting("FxSunIntensity", 0);
+       renodx::utils::settings::UpdateSetting("FxBurleyDiffuse", 0);
+       renodx::utils::settings::UpdateSetting("FxProbeModulation", 0);
   //   renodx::utils::settings::UpdateSetting("colorGradeExposure", 1.f);
   //   renodx::utils::settings::UpdateSetting("colorGradeHighlights", 50.f);
   //   renodx::utils::settings::UpdateSetting("colorGradeShadows", 50.f);
